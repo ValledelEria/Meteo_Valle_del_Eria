@@ -1,0 +1,12 @@
+serie,primera_hora_sin_dato,ultima_hora_sin_dato,horas_sin_dato
+castrocalbon_temperatura,2026-09-17 16:00,2026-09-18 06:00,15
+castrocalbon_temperatura,2026-10-11 04:00,2026-10-12 13:00,34
+castrocalbon_lluvia,2026-09-17 16:00,2026-09-18 10:00,19
+castrocalbon_lluvia,2026-10-01 00:00,2026-10-02 22:00,47
+castrocalbon_lluvia,2026-10-11 04:00,2026-10-12 17:00,38
+moralesdelrey_temperatura,2026-09-17 16:00,2026-09-18 06:00,15
+moralesdelrey_temperatura,2026-10-11 04:00,2026-10-12 13:00,34
+moralesdelrey_lluvia,2026-08-05 11:00,2026-08-05 11:00,1
+moralesdelrey_lluvia,2026-09-17 16:00,2026-09-18 10:00,19
+moralesdelrey_lluvia,2026-10-01 00:00,2026-10-03 08:00,57
+moralesdelrey_lluvia,2026-10-11 04:00,2026-10-12 17:00,38

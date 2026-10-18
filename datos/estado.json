@@ -1,0 +1,50 @@
+{
+  "ejecucion_utc": "2026-10-18 13:49",
+  "series": {
+    "castrocalbon_temperatura": {
+      "url": "https://www.saihduero.es/risr/PL284/historico/xATRUFURfRDOywEU",
+      "titulo": "Temperatura ambiente en Pluviómetro de Castrocalbón",
+      "metodo": "tabla",
+      "datos_leidos": 1119,
+      "filas_nuevas": 1119,
+      "filas_modificadas": 0,
+      "filas_total": 1119,
+      "primer_dato": "2026-08-31 00:00",
+      "ultimo_dato": "2026-10-18 15:00"
+    },
+    "castrocalbon_lluvia": {
+      "url": "https://www.saihduero.es/risr/PL284/historico/xADTQNURfRDOywEU",
+      "titulo": "Pluviometría en Pluviómetro de Castrocalbón",
+      "metodo": "tabla",
+      "datos_leidos": 2072,
+      "filas_nuevas": 2072,
+      "filas_modificadas": 0,
+      "filas_total": 2072,
+      "primer_dato": "2026-07-20 00:00",
+      "ultimo_dato": "2026-10-18 15:00"
+    },
+    "moralesdelrey_temperatura": {
+      "url": "https://www.saihduero.es/risr/EA082/historico/xATRUFURfJDOwEUR",
+      "titulo": "Temperatura ambiente en Eria en Morales del Rey",
+      "metodo": "tabla",
+      "datos_leidos": 1119,
+      "filas_nuevas": 1119,
+      "filas_modificadas": 0,
+      "filas_total": 1119,
+      "primer_dato": "2026-08-31 00:00",
+      "ultimo_dato": "2026-10-18 15:00"
+    },
+    "moralesdelrey_lluvia": {
+      "url": "https://www.saihduero.es/risr/EA082/historico/xADTQNURfJDOwEUR",
+      "titulo": "Pluviometría en Eria en Morales del Rey",
+      "metodo": "tabla",
+      "datos_leidos": 2061,
+      "filas_nuevas": 2061,
+      "filas_modificadas": 0,
+      "filas_total": 2061,
+      "primer_dato": "2026-07-20 00:00",
+      "ultimo_dato": "2026-10-18 15:00"
+    }
+  },
+  "problemas": []
+}
