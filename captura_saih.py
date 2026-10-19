@@ -1,257 +1,198 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Captura diaria de datos horarios del SAIH Duero (temperatura y lluvia).
+"""Captura incremental y segura de cuatro series meteorologicas SAIH Duero.
 
-Qué hace, en cada ejecución:
-  1. Descarga las páginas de histórico de cada serie (4 en total).
-  2. Extrae los datos horarios que la web tiene publicados en ese momento.
-  3. Los añade a un CSV acumulado por serie (carpeta datos/), sin duplicar horas.
-  4. Anota los huecos (horas sin dato) en datos/huecos.csv.
-  5. Escribe datos/estado.json con el resultado de la ejecución.
-  6. Termina con error (código 1) si algo no es como se espera, para que
-     GitHub lo marque en rojo y avise por correo.
-
-Importante: los huecos se quedan VACÍOS. Nunca se rellenan con ceros ni se inventan.
-Solo usa la biblioteca estándar de Python (no hace falta instalar nada).
+CSV historicos: epoch,fecha_hora_local,valor,calidad (UTF-8, coma, punto decimal).
+No se crean filas artificiales para horas sin observacion.
 """
 import csv
-import html as htmllib
+import html
 import json
+import math
 import os
 import re
 import sys
+import tempfile
 import time
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-TZ = ZoneInfo("Europe/Madrid")
-CARPETA = Path(os.environ.get("CARPETA_DATOS", "datos"))
-BASE = "https://www.saihduero.es/risr/"
-
-# Las cuatro series. Las direcciones son las que se comprobaron a mano.
+TZ = ZoneInfo('Europe/Madrid')
+DATOS = Path(os.environ.get('CARPETA_DATOS', 'datos'))
+BASE = 'https://www.saihduero.es/risr/'
 SERIES = {
-    "castrocalbon_temperatura": {
-        "url": BASE + "PL284/historico/xATRUFURfRDOywEU",
-        "titulo": "Temperatura ambiente",
-        "tipo": "temperatura",
-    },
-    "castrocalbon_lluvia": {
-        "url": BASE + "PL284/historico/xADTQNURfRDOywEU",
-        "titulo": "Pluviometría",
-        "tipo": "lluvia",
-    },
-    "moralesdelrey_temperatura": {
-        "url": BASE + "EA082/historico/xATRUFURfJDOwEUR",
-        "titulo": "Temperatura ambiente",
-        "tipo": "temperatura",
-    },
-    "moralesdelrey_lluvia": {
-        "url": BASE + "EA082/historico/xADTQNURfJDOwEUR",
-        "titulo": "Pluviometría",
-        "tipo": "lluvia",
-    },
+    'castrocalbon_temperatura': (BASE + 'PL284/historico/xATRUFURfRDOywEU', 'Temperatura ambiente', 'temperatura'),
+    'castrocalbon_lluvia': (BASE + 'PL284/historico/xADTQNURfRDOywEU', 'Pluviometría', 'lluvia'),
+    'moralesdelrey_temperatura': (BASE + 'EA082/historico/xATRUFURfJDOwEUR', 'Temperatura ambiente', 'temperatura'),
+    'moralesdelrey_lluvia': (BASE + 'EA082/historico/xADTQNURfJDOwEUR', 'Pluviometría', 'lluvia'),
 }
-
-# --- Ajustes (SUPUESTOS míos, no datos del SAIH; se pueden cambiar) ---------
-# Lluvia por encima de este valor en UNA hora se marca como "dudoso" y no se
-# suma en los totales diarios. Motivo: el primer dato de las series de lluvia
-# (20/07/2026 00:00) marca 120 l/m2 en las dos estaciones a la vez, y parece
-# un artefacto del inicio de la serie, no lluvia real.
-UMBRAL_LLUVIA_DUDOSA = 50.0
-# Temperaturas fuera de este rango se marcan como "dudoso".
-TEMP_MIN, TEMP_MAX = -30.0, 50.0
-# Si el último dato de una serie tiene más antigüedad que esto, se avisa.
-MAX_ANTIGUEDAD_HORAS = 36
-# Una página con menos filas que estas se considera sospechosa.
+CAMPOS = ['epoch', 'fecha_hora_local', 'valor', 'calidad']
+RE_FILA = re.compile(r'<td\b(?=[^>]*\bclass=["\'][^"\']*\bdatefield\b)(?=[^>]*\bdata-order=["\'](\d+)["\'])[^>]*>.*?</td>\s*<td\b(?=[^>]*\bclass=["\'][^"\']*\bvaluefield\b)(?=[^>]*\bdata-order=["\']([^"\']*)["\'])[^>]*>', re.I | re.S)
+RE_TITULO = re.compile(r'<h3[^>]*text-themecolor[^>]*>(.*?)</h3>', re.I | re.S)
+RE_GRAFICA = re.compile(r'\{\s*d\s*:\s*["\'](\d\d/\d\d/\d{4} \d\d:\d\d)["\']\s*,\s*v\s*:\s*(-?\d+(?:\.\d+)?)\s*\}')
 MIN_FILAS = 24
-# -----------------------------------------------------------------------------
-
-CAMPOS = ["epoch", "fecha_hora_local", "valor", "calidad"]
-
-# Formato de la tabla de valores de la web (comprobado en el código fuente):
-#   <td class="datefield" data-order="1788127200">31/08/2026 00:00</td>
-#   <td class="valuefield" data-order="15.20">15,20</td>
-# El número de data-order de la fecha es la hora exacta (segundos desde 1970),
-# lo que evita confusiones en el cambio de hora de octubre.
-RE_FILA = re.compile(
-    r'<td[^>]*class="datefield"[^>]*data-order="(\d+)"[^>]*>[^<]*</td>\s*'
-    r'<td[^>]*class="valuefield"[^>]*data-order="([^"]*)"[^>]*>',
-    re.S,
-)
-# Plan B: la matriz de datos de la gráfica   {d:"31/08/2026 00:00", v:15.20}
-RE_GRAFICA = re.compile(r'\{\s*d:"(\d\d/\d\d/\d{4} \d\d:\d\d)"\s*,\s*v:\s*(-?[\d.]+)\s*\}')
-RE_TITULO = re.compile(r"<h3[^>]*text-themecolor[^>]*>(.*?)</h3>", re.S)
+MAX_ANTIGUEDAD_HORAS = 36
+# Los datos anteriores a la ventana de 49 dias nunca se sustituyen.
+DIAS_REVISION = 49
 
 
 def descargar(url, intentos=3):
-    """Descarga una página con reintentos."""
-    ultimo_error = None
-    for n in range(1, intentos + 1):
+    error = None
+    for intento in range(intentos):
         try:
-            peticion = urllib.request.Request(
-                url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (compatible; MeteoValledelEria/1.0)",
-                    "Accept-Language": "es-ES,es;q=0.9",
-                },
-            )
-            with urllib.request.urlopen(peticion, timeout=60) as respuesta:
-                return respuesta.read().decode("utf-8", errors="replace")
-        except Exception as error:  # noqa: BLE001
-            ultimo_error = error
-            time.sleep(5 * n)
-    raise RuntimeError(f"No se pudo descargar la página: {ultimo_error}")
+            req = urllib.request.Request(url, headers={'User-Agent': 'MeteoValleEria/2.0', 'Accept-Language': 'es-ES'})
+            with urllib.request.urlopen(req, timeout=45) as r:
+                return r.read().decode('utf-8', errors='replace')
+        except Exception as exc:
+            error = exc
+            if intento < intentos - 1:
+                time.sleep(3 * (intento + 1))
+    raise RuntimeError(f'Error de descarga: {error}')
 
 
 def parsear(pagina):
-    """Devuelve (título de la página, {epoch: valor}, método usado)."""
     m = RE_TITULO.search(pagina)
-    titulo = ""
-    if m:
-        titulo = htmllib.unescape(re.sub(r"<[^>]+>", "", m.group(1)))
-        titulo = re.sub(r"\s+", " ", titulo).strip()
-
-    datos = {}
-    for epoch, valor in RE_FILA.findall(pagina):
-        if valor.strip() == "":
-            continue  # hora sin dato: se queda vacía
+    titulo = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', '', m.group(1)))).strip() if m else ''
+    valores = {}
+    for ep, valor in RE_FILA.findall(pagina):
+        if not valor.strip():
+            continue
         try:
-            datos[int(epoch)] = float(valor)
+            numero = float(valor.replace(',', '.'))
+            if math.isfinite(numero):
+                valores[int(ep)] = numero
         except ValueError:
             continue
-    if datos:
-        return titulo, datos, "tabla"
-
-    # Plan B (por si la web cambia la tabla pero mantiene la gráfica)
+    if valores:
+        return titulo, valores, 'tabla'
     vistos = set()
-    for texto, valor in RE_GRAFICA.findall(pagina):
-        pliegue = 1 if texto in vistos else 0  # 2ª vez que sale la misma hora: cambio de hora
-        vistos.add(texto)
-        momento = datetime.strptime(texto, "%d/%m/%Y %H:%M").replace(tzinfo=TZ, fold=pliegue)
-        datos[int(momento.timestamp())] = float(valor)
-    return titulo, datos, "grafica"
+    for fecha, valor in RE_GRAFICA.findall(pagina):
+        pliegue = int(fecha in vistos)
+        vistos.add(fecha)
+        dt = datetime.strptime(fecha, '%d/%m/%Y %H:%M').replace(tzinfo=TZ, fold=pliegue)
+        valores[int(dt.timestamp())] = float(valor)
+    return titulo, valores, 'grafica'
 
 
 def calidad(tipo, valor):
-    if tipo == "lluvia":
-        return "dudoso" if (valor < 0 or valor > UMBRAL_LLUVIA_DUDOSA) else "ok"
-    return "dudoso" if (valor < TEMP_MIN or valor > TEMP_MAX) else "ok"
-
-
-def hora_local(epoch):
-    return datetime.fromtimestamp(epoch, TZ).strftime("%Y-%m-%d %H:%M")
+    if tipo == 'lluvia':
+        return 'dudoso' if valor < 0 or valor > 50 else 'ok'
+    return 'dudoso' if valor < -30 or valor > 50 else 'ok'
 
 
 def leer_csv(ruta):
-    datos = {}
-    if ruta.exists():
-        with ruta.open(newline="", encoding="utf-8") as f:
-            for fila in csv.DictReader(f):
-                datos[int(fila["epoch"])] = float(fila["valor"])
-    return datos
+    """Fallar ante CSV corrupto; nunca sustituirlo silenciosamente."""
+    if not ruta.exists():
+        return {}
+    salida = {}
+    with ruta.open('r', encoding='utf-8-sig', newline='') as f:
+        lector = csv.DictReader(f)
+        if lector.fieldnames != CAMPOS:
+            raise ValueError(f'Cabeceras inesperadas en {ruta}: {lector.fieldnames}')
+        ultimo = None
+        for numero, fila in enumerate(lector, start=2):
+            try:
+                epoch = int(fila['epoch'])
+                valor = float(fila['valor'])
+                esperado = datetime.fromtimestamp(epoch, TZ).strftime('%Y-%m-%d %H:%M')
+                if not math.isfinite(valor) or epoch % 3600 or fila['fecha_hora_local'] != esperado:
+                    raise ValueError('hora o valor no valido')
+                if fila['calidad'] not in ('ok', 'dudoso'):
+                    raise ValueError('calidad desconocida')
+                if ultimo is not None and epoch <= ultimo:
+                    raise ValueError('horas duplicadas o desordenadas')
+                salida[epoch] = valor
+                ultimo = epoch
+            except (ValueError, TypeError, OverflowError) as exc:
+                raise ValueError(f'{ruta}:{numero}: {exc}') from exc
+    return salida
 
 
-def escribir_csv(ruta, datos, tipo):
-    with ruta.open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(CAMPOS)
-        for epoch in sorted(datos):
-            v = datos[epoch]
-            w.writerow([epoch, hora_local(epoch), f"{v:.2f}", calidad(tipo, v)])
+def generar_csv(ruta, valores, tipo):
+    with ruta.open('w', encoding='utf-8', newline='') as f:
+        escritor = csv.writer(f, lineterminator='\n')
+        escritor.writerow(CAMPOS)
+        for epoch, valor in sorted(valores.items()):
+            local = datetime.fromtimestamp(epoch, TZ).strftime('%Y-%m-%d %H:%M')
+            escritor.writerow([epoch, local, f'{valor:.2f}', calidad(tipo, valor)])
 
 
-def buscar_huecos(epochs):
-    """Lista de (primera hora que falta, última hora que falta, nº de horas)."""
-    ordenados = sorted(epochs)
-    huecos = []
-    for a, b in zip(ordenados, ordenados[1:]):
-        if b - a > 3600:
-            huecos.append((a + 3600, b - 3600, (b - a) // 3600 - 1))
-    return huecos
+def preparar(anteriores, nuevos, ahora_epoch):
+    """Anade horas; corrige solo en ventana disponible sin borrar historico."""
+    limite = ahora_epoch - DIAS_REVISION * 86400
+    resultado = dict(anteriores)
+    cambios = 0
+    for epoch, valor in nuevos.items():
+        if epoch > ahora_epoch + 3600 or epoch % 3600 or not math.isfinite(valor):
+            raise ValueError(f'epoch o valor inesperado: {epoch} / {valor}')
+        if epoch not in resultado:
+            resultado[epoch] = valor
+        elif epoch >= limite and round(resultado[epoch], 2) != round(valor, 2):
+            resultado[epoch] = valor
+            cambios += 1
+    return resultado, len(set(resultado) - set(anteriores)), cambios
 
 
-def main():
-    CARPETA.mkdir(parents=True, exist_ok=True)
+def huecos(valores):
+    claves = sorted(valores)
+    for anterior, siguiente in zip(claves, claves[1:]):
+        if siguiente - anterior > 3600:
+            yield anterior + 3600, siguiente - 3600, (siguiente - anterior)//3600 - 1
+
+
+def ejecutar():
+    DATOS.mkdir(parents=True, exist_ok=True)
     ahora = datetime.now(timezone.utc)
-    estado = {"ejecucion_utc": ahora.strftime("%Y-%m-%d %H:%M"), "series": {}, "problemas": []}
-    filas_huecos = []
-
-    for nombre, cfg in SERIES.items():
-        info = {"url": cfg["url"]}
-        ruta = CARPETA / f"{nombre}.csv"
-        try:
-            pagina = descargar(cfg["url"])
+    registro = {'ejecucion_utc': ahora.isoformat(timespec='seconds'), 'estado': 'error', 'series': {}, 'problemas': []}
+    preparados = {}
+    try:
+        # Primera fase: descargar y validar TODAS las series antes de escribir los CSV.
+        for nombre, (url, titulo_esperado, tipo) in SERIES.items():
+            pagina = descargar(url)
             titulo, nuevos, metodo = parsear(pagina)
-            if cfg["titulo"].lower() not in titulo.lower():
-                raise ValueError(
-                    f"La página no es la esperada (título leído: '{titulo}', "
-                    f"se esperaba algo con '{cfg['titulo']}')."
-                )
+            if titulo_esperado.casefold() not in titulo.casefold():
+                raise ValueError(f'{nombre}: titulo inesperado ({titulo!r}); posible cambio web SAIH')
             if len(nuevos) < MIN_FILAS:
-                raise ValueError(f"Solo se han leído {len(nuevos)} datos; se esperaban al menos {MIN_FILAS}.")
-
-            previos = leer_csv(ruta)
-            anadidas = len(set(nuevos) - set(previos))
-            cambiadas = sum(1 for e, v in nuevos.items() if e in previos and abs(previos[e] - v) > 1e-9)
-            previos.update(nuevos)  # el dato más reciente de la web manda (son datos provisionales)
-            escribir_csv(ruta, previos, cfg["tipo"])
-
-            info.update(
-                titulo=titulo,
-                metodo=metodo,
-                datos_leidos=len(nuevos),
-                filas_nuevas=anadidas,
-                filas_modificadas=cambiadas,
-                filas_total=len(previos),
-                primer_dato=hora_local(min(previos)),
-                ultimo_dato=hora_local(max(previos)),
-            )
-        except Exception as error:  # noqa: BLE001
-            info["error"] = str(error)
-            estado["problemas"].append(f"{nombre}: {error}")
-        estado["series"][nombre] = info
-        time.sleep(2)  # cortesía con la web
-
-    # Informe de huecos y comprobación de frescura, con lo que haya en los CSV
-    for nombre, cfg in SERIES.items():
-        datos = leer_csv(CARPETA / f"{nombre}.csv")
-        if not datos:
-            continue
-        for desde, hasta, horas in buscar_huecos(datos):
-            filas_huecos.append([nombre, hora_local(desde), hora_local(hasta), horas])
-        antiguedad_h = (ahora.timestamp() - max(datos)) / 3600
-        if antiguedad_h > MAX_ANTIGUEDAD_HORAS:
-            estado["problemas"].append(
-                f"{nombre}: el último dato tiene {antiguedad_h:.0f} horas de antigüedad "
-                f"(límite {MAX_ANTIGUEDAD_HORAS})."
-            )
-
-    with (CARPETA / "huecos.csv").open("w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f)
-        w.writerow(["serie", "primera_hora_sin_dato", "ultima_hora_sin_dato", "horas_sin_dato"])
-        w.writerows(filas_huecos)
-
-    (CARPETA / "estado.json").write_text(json.dumps(estado, ensure_ascii=False, indent=2), encoding="utf-8")
-
-    for nombre, info in estado["series"].items():
-        if "error" in info:
-            print(f"[ERROR] {nombre}: {info['error']}")
-        else:
-            print(
-                f"[ok] {nombre}: {info['datos_leidos']} datos leídos, "
-                f"{info['filas_nuevas']} nuevos, {info['filas_modificadas']} modificados, "
-                f"total {info['filas_total']} ({info['primer_dato']} → {info['ultimo_dato']})"
-            )
-    if estado["problemas"]:
-        print("\nPROBLEMAS:")
-        for p in estado["problemas"]:
-            print(" -", p)
-        return 1
-    return 0
+                raise ValueError(f'{nombre}: solo {len(nuevos)} observaciones; posible cambio web SAIH')
+            if (ahora.timestamp() - max(nuevos)) / 3600 > MAX_ANTIGUEDAD_HORAS:
+                raise ValueError(f'{nombre}: ultima observacion SAIH demasiado antigua; revisar servicio')
+            antiguos = leer_csv(DATOS / f'{nombre}.csv')
+            fusion, altas, cambios = preparar(antiguos, nuevos, int(ahora.timestamp()))
+            if not fusion or not set(antiguos).issubset(fusion):
+                raise ValueError(f'{nombre}: riesgo de perdida de historico')
+            preparados[nombre] = (fusion, tipo)
+            registro['series'][nombre] = {'metodo': metodo, 'leidos': len(nuevos), 'nuevos': altas,
+                                          'corregidos': cambios, 'total': len(fusion), 'ultimo_epoch': max(fusion)}
+            print(f'{nombre}: {len(nuevos)} leidos, {altas} nuevos, {cambios} corregidos')
+            time.sleep(1)
+        # Segunda fase: generar todos los archivos completos antes de reemplazar los anteriores.
+        with tempfile.TemporaryDirectory(prefix='meteo_') as carpeta:
+            temporal = Path(carpeta)
+            for nombre, (valores, tipo) in preparados.items():
+                generar_csv(temporal / f'{nombre}.csv', valores, tipo)
+                verificar = leer_csv(temporal / f'{nombre}.csv')
+                if len(verificar) != len(valores):
+                    raise ValueError(f'{nombre}: error al verificar CSV generado')
+            with (temporal / 'huecos.csv').open('w', encoding='utf-8', newline='') as f:
+                w = csv.writer(f, lineterminator='\n')
+                w.writerow(['serie', 'primera_hora_sin_dato', 'ultima_hora_sin_dato', 'horas_sin_dato'])
+                for nombre, (valores, _) in preparados.items():
+                    for a, b, cantidad in huecos(valores):
+                        w.writerow([nombre, datetime.fromtimestamp(a, TZ).strftime('%Y-%m-%d %H:%M'),
+                                    datetime.fromtimestamp(b, TZ).strftime('%Y-%m-%d %H:%M'), cantidad])
+            for nombre in preparados:
+                os.replace(temporal / f'{nombre}.csv', DATOS / f'{nombre}.csv')
+            os.replace(temporal / 'huecos.csv', DATOS / 'huecos.csv')
+        registro['estado'] = 'ok'
+    except Exception as exc:
+        mensaje = str(exc)
+        registro['problemas'].append(mensaje)
+        print('ERROR:', mensaje, file=sys.stderr)
+    # Guardar diagnostico incluso si falla, para que Actions pueda publicarlo.
+    (DATOS / 'estado.json').write_text(json.dumps(registro, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    return 0 if registro['estado'] == 'ok' else 1
 
 
-if __name__ == "__main__":
-    sys.exit(main())
+if __name__ == '__main__':
+    sys.exit(ejecutar())
