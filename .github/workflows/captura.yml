@@ -1,55 +1,41 @@
-# Este archivo debe guardarse en el repositorio con la ruta:
-#   .github/workflows/captura.yml
-name: Captura diaria SAIH
-
+name: Captura diaria SAIH Duero
 on:
   schedule:
-    - cron: "17 5 * * *"   # cada día a las 05:17 UTC (07:17 en verano, 06:17 en invierno, hora de España)
-  workflow_dispatch:        # permite lanzarlo a mano desde la pestaña Actions
-
+    - cron: '17 5 * * *'
+  workflow_dispatch:
 permissions:
-  contents: write           # necesario para guardar los datos en el repositorio
-
+  contents: write
+concurrency:
+  group: captura-saih-main
+  cancel-in-progress: false
 jobs:
   captura:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Descargar el repositorio
-        uses: actions/checkout@v4
-
-      - name: Preparar Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
         with:
-          python-version: "3.12"
-
-      - name: Instalar openpyxl (para el Excel)
-        run: pip install openpyxl
-
-      - name: Capturar datos del SAIH
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Comprobar codigo
+        run: python -m unittest discover -s tests -v
+      - name: Capturar las cuatro series
         id: captura
-        continue-on-error: true   # si falla, seguimos para guardar lo que haya y avisar después
+        continue-on-error: true
         run: python captura_saih.py
-
-      - name: Construir el Excel
-        env:
-          FORZAR_EXCEL: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
-        run: python construir_excel.py
-
-      - name: Guardar los cambios en el repositorio
+      - name: Guardar CSV y diagnostico
         run: |
-          git config user.name "meteo-bot"
-          git config user.email "meteo-bot@users.noreply.github.com"
-          git add datos Meteo_ValledelEria_datos.xlsx
-          if git diff --staged --quiet; then
-            echo "No hay cambios que guardar."
-          else
-            git commit -m "Datos $(date -u +%F)"
+          git config user.name 'meteo-bot'
+          git config user.email 'meteo-bot@users.noreply.github.com'
+          git add datos/
+          if ! git diff --cached --quiet; then
+            git commit -m "Captura SAIH $(date -u +%F)"
             git push
           fi
-
-      - name: Avisar si la captura falló
+      - name: Notificar fallo de captura
         if: steps.captura.outcome == 'failure'
         run: |
-          echo "La captura tuvo problemas. Mira el paso 'Capturar datos del SAIH' para ver el motivo."
+          echo 'Fallo de captura SAIH: revisar datos/estado.json y los registros del workflow'
           exit 1
