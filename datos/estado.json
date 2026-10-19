@@ -1,49 +1,38 @@
 {
-  "ejecucion_utc": "2026-10-19 05:50",
+  "ejecucion_utc": "2026-10-19T07:06:06+00:00",
+  "estado": "ok",
   "series": {
     "castrocalbon_temperatura": {
-      "url": "https://www.saihduero.es/risr/PL284/historico/xATRUFURfRDOywEU",
-      "titulo": "Temperatura ambiente en Pluviómetro de Castrocalbón",
       "metodo": "tabla",
-      "datos_leidos": 1135,
-      "filas_nuevas": 16,
-      "filas_modificadas": 0,
-      "filas_total": 1135,
-      "primer_dato": "2026-08-31 00:00",
-      "ultimo_dato": "2026-10-19 07:00"
+      "leidos": 1136,
+      "nuevos": 1,
+      "corregidos": 0,
+      "total": 1136,
+      "ultimo_epoch": 1792389600
     },
     "castrocalbon_lluvia": {
-      "url": "https://www.saihduero.es/risr/PL284/historico/xADTQNURfRDOywEU",
-      "titulo": "Pluviometría en Pluviómetro de Castrocalbón",
       "metodo": "tabla",
-      "datos_leidos": 2064,
-      "filas_nuevas": 16,
-      "filas_modificadas": 1,
-      "filas_total": 2088,
-      "primer_dato": "2026-07-20 00:00",
-      "ultimo_dato": "2026-10-19 07:00"
+      "leidos": 2065,
+      "nuevos": 1,
+      "corregidos": 0,
+      "total": 2089,
+      "ultimo_epoch": 1792389600
     },
     "moralesdelrey_temperatura": {
-      "url": "https://www.saihduero.es/risr/EA082/historico/xATRUFURfJDOwEUR",
-      "titulo": "Temperatura ambiente en Eria en Morales del Rey",
       "metodo": "tabla",
-      "datos_leidos": 1135,
-      "filas_nuevas": 16,
-      "filas_modificadas": 0,
-      "filas_total": 1135,
-      "primer_dato": "2026-08-31 00:00",
-      "ultimo_dato": "2026-10-19 07:00"
+      "leidos": 1136,
+      "nuevos": 1,
+      "corregidos": 0,
+      "total": 1136,
+      "ultimo_epoch": 1792389600
     },
     "moralesdelrey_lluvia": {
-      "url": "https://www.saihduero.es/risr/EA082/historico/xADTQNURfJDOwEUR",
-      "titulo": "Pluviometría en Eria en Morales del Rey",
       "metodo": "tabla",
-      "datos_leidos": 2053,
-      "filas_nuevas": 16,
-      "filas_modificadas": 1,
-      "filas_total": 2077,
-      "primer_dato": "2026-07-20 00:00",
-      "ultimo_dato": "2026-10-19 07:00"
+      "leidos": 2054,
+      "nuevos": 1,
+      "corregidos": 0,
+      "total": 2078,
+      "ultimo_epoch": 1792389600
     }
   },
   "problemas": []
