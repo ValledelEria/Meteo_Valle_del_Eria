@@ -1,89 +1,67 @@
 # Meteo Valle del Eria
 
-**Archivo histórico automatizado de datos meteorológicos del Valle del Eria (León y Zamora, España).**
+Archivo historico de observaciones horarias publicadas por **SAIH Duero** para:
 
-Este proyecto recopila y conserva observaciones horarias de temperatura ambiente y precipitación procedentes del Sistema Automático de Información Hidrológica (SAIH) de la Confederación Hidrográfica del Duero.
+- **Castrocalbon (PL284)**: temperatura y precipitacion.
+- **Morales del Rey (EA082)**: temperatura y precipitacion.
 
-Su finalidad es mantener un registro histórico continuo, estructurado y accesible de las mediciones disponibles para dos estaciones situadas en el entorno del Valle del Eria.
+El proposito es conservar un historico que vaya mas alla del periodo disponible en el portal de origen. El analisis se realiza **en un Excel local con Power Query**. Este repositorio no genera libros Excel.
 
-## Estaciones meteorológicas
+## Archivos fuente para Power Query
 
-| Estación | Código | Variables |
-|---|---|---|
-| Castrocalbón | PL284 | Temperatura y precipitación |
-| Morales del Rey | EA082 | Temperatura y precipitación |
+En `datos/` hay cuatro CSV historicos, uno por serie:
 
-## Datos disponibles
+- `castrocalbon_temperatura.csv`
+- `castrocalbon_lluvia.csv`
+- `moralesdelrey_temperatura.csv`
+- `moralesdelrey_lluvia.csv`
 
-El repositorio conserva cuatro series temporales independientes:
+Todos tienen **exactamente** las mismas columnas:
 
-- Temperatura horaria de Castrocalbón.
-- Precipitación horaria de Castrocalbón.
-- Temperatura horaria de Morales del Rey.
-- Precipitación horaria de Morales del Rey.
+| Columna | Contenido | Tipo sugerido PQ |
+| --- | --- | --- |
+| `epoch` | Segundos Unix UTC, clave unica por serie y hora | Numero entero (Int64) |
+| `fecha_hora_local` | Texto `AAAA-MM-DD HH:MM`, hora oficial de Espana | Texto (evita ambiguedad DST) |
+| `valor` | Temperatura en °C o lluvia horaria en l/m² | Numero decimal, configuracion regional `en-US` |
+| `calidad` | `ok` o `dudoso` (reglas del proyecto) | Texto |
 
-Los datos se almacenan en archivos CSV que se actualizan automáticamente y permiten su consulta, descarga y reutilización.
+Convenciones fijas: UTF-8 sin BOM, coma como separador de columnas, punto decimal, valores con dos decimales, primera fila de cabeceras, orden cronologico creciente y una sola fila por `epoch`. Si falta una observacion, **no se crea un cero**; simplemente no existe esa fila. Para construir horas faltantes en Excel, generar un calendario de horas y combinarlo por `epoch`.
 
-### Estructura de los archivos
+**Importante:** en la madrugada del cambio de horario de octubre existen dos horas locales iguales. Por eso la clave para combinar series es `epoch` y no `fecha_hora_local`.
 
-Cada registro contiene los siguientes campos:
+Las mediciones son provisionales; las reglas de calidad locales no sustituyen una validacion meteorologica oficial. Temperaturas fuera de -30 a 50 °C y lluvia por encima de 50 l/m²/h o negativa se marcan `dudoso`, pero **no se borran**.
 
-| Campo | Descripción |
-|---|---|
-| `epoch` | Marca temporal Unix, en segundos UTC |
-| `fecha_hora_local` | Fecha y hora local de la observación |
-| `valor` | Valor de la variable meteorológica |
-| `calidad` | Indicador de calidad del registro |
+## Actualizacion automatica
 
-Los valores de temperatura se expresan en grados Celsius (°C) y los de precipitación en litros por metro cuadrado (l/m²), equivalentes a milímetros de lluvia.
+El workflow `.github/workflows/captura.yml` se ejecuta cada dia a las 05:17 UTC y puede iniciarse manualmente desde **Actions > Captura diaria SAIH Duero > Run workflow**. Cada captura vuelve a descargar las series disponibles, agrega nuevas horas y acepta revisiones de las ultimas 49 jornadas. Nunca elimina horas historicas porque hayan desaparecido de la web.
 
-## Recopilación y actualización
+Antes de modificar los CSV comprueba los cuatro canales, el formato del HTML, el numero minimo de observaciones, la frescura de los datos y la integridad de los CSV preexistentes. Si una serie falla, los cuatro historicos quedan como estaban. Se escribe el diagnostico en `datos/estado.json` y el workflow termina en rojo para permitir los avisos de GitHub.
 
-La recopilación se realiza mediante un proceso automatizado desarrollado en Python y ejecutado periódicamente a través de GitHub Actions.
+`datos/huecos.csv` es un diagnostico auxiliar, no un quinto archivo de observaciones.
 
-El sistema está diseñado para:
+## Configurar avisos
 
-- Consultar los datos disponibles en SAIH Duero.
-- Incorporar nuevas observaciones al histórico.
-- Evitar registros duplicados.
-- Conservar las mediciones de periodos anteriores.
-- Incorporar correcciones de observaciones recientes cuando estén disponibles.
-- Detectar errores de captura o formatos inesperados.
-- Mantener una estructura homogénea en los archivos publicados.
+En GitHub, ve a **Settings > Notifications > System > Actions** y activa las notificaciones por correo cuando fallen los workflows. Ademas, revisa que el repositorio permita escribir desde GitHub Actions en **Settings > Actions > General > Workflow permissions** cuando corresponda.
 
-Dado que la fuente ofrece una ventana temporal limitada de consulta, la recopilación periódica permite conservar observaciones que posteriormente dejan de estar disponibles en el histórico reciente del portal.
+## Pruebas
 
-## Integridad y calidad de los datos
+Sin librerias externas:
 
-Las observaciones se conservan con su correspondiente referencia temporal y sin aplicar interpolaciones para completar periodos sin información.
+```sh
+python -m unittest discover -s tests -v
+python captura_saih.py
+```
 
-La ausencia de una medición no debe interpretarse como un valor cero.
+La segunda orden requiere acceso a internet y consulta las paginas reales.
 
-Los registros que superan determinados umbrales de comprobación pueden identificarse mediante el indicador `dudoso`. Estos criterios constituyen controles internos del proyecto y no equivalen a una validación oficial por parte del organismo de origen.
+## Conectar desde Power Query
 
-La disponibilidad de los registros depende de la información facilitada por la fuente y del funcionamiento de las capturas automatizadas.
+Usar **Datos > Obtener datos > Desde web**, con una URL como:
 
-## Fuente y atribución
+`https://raw.githubusercontent.com/ValledelEria/Meteo_Valle_del_Eria/main/datos/castrocalbon_temperatura.csv`
 
-**Fuente de los datos:** Sistema Automático de Información Hidrológica (SAIH Duero), Confederación Hidrográfica del Duero.
+Importar como CSV separado por comas, con codificacion UTF-8, asignar `epoch` a Int64, `fecha_hora_local` a texto, `valor` a decimal **utilizando configuracion regional Ingles (Estados Unidos)** y `calidad` a texto. La consulta se actualiza al pulsar **Actualizar todo** en Excel.
 
-Web oficial: https://www.saihduero.es/
+### Aviso legal
 
-Los datos publicados por SAIH Duero tienen carácter provisional y pueden estar sujetos a revisiones, correcciones o interrupciones del servicio.
-
-Este repositorio es un proyecto independiente y no está afiliado ni representa oficialmente a la Confederación Hidrográfica del Duero.
-
-La disponibilidad pública de los archivos no sustituye las condiciones de acceso, uso y reutilización establecidas por el organismo de origen.
-
-## Alcance y limitaciones
-
-Este proyecto tiene carácter documental y de conservación histórica.
-
-Los datos publicados no constituyen observaciones meteorológicas oficialmente certificadas ni deben utilizarse como única referencia en actividades que requieran información meteorológica validada.
-
-El mantenimiento del repositorio, la periodicidad de actualización y la continuidad de la recopilación están sujetos a la disponibilidad de la fuente y a las condiciones técnicas del servicio.
-
----
-
-**Meteo Valle del Eria**  
-Repositorio público de observaciones meteorológicas históricas del Valle del Eria.
+SAIH Duero / Confederacion Hidrografica del Duero es la fuente. Proyecto independiente. Revisar las condiciones de reutilizacion de la fuente. La informacion es provisional.
