@@ -1,38 +1,38 @@
 {
-  "ejecucion_utc": "2026-10-20T05:49:55+00:00",
+  "ejecucion_utc": "2026-10-21T05:50:40+00:00",
   "estado": "ok",
   "series": {
     "castrocalbon_temperatura": {
       "metodo": "tabla",
-      "leidos": 1159,
-      "nuevos": 23,
+      "leidos": 1183,
+      "nuevos": 24,
       "corregidos": 0,
-      "total": 1159,
-      "ultimo_epoch": 1792472400
+      "total": 1183,
+      "ultimo_epoch": 1792558800
     },
     "castrocalbon_lluvia": {
       "metodo": "tabla",
       "leidos": 2064,
-      "nuevos": 23,
+      "nuevos": 24,
       "corregidos": 0,
-      "total": 2112,
-      "ultimo_epoch": 1792472400
+      "total": 2136,
+      "ultimo_epoch": 1792558800
     },
     "moralesdelrey_temperatura": {
       "metodo": "tabla",
-      "leidos": 1159,
-      "nuevos": 23,
+      "leidos": 1183,
+      "nuevos": 24,
       "corregidos": 0,
-      "total": 1159,
-      "ultimo_epoch": 1792472400
+      "total": 1183,
+      "ultimo_epoch": 1792558800
     },
     "moralesdelrey_lluvia": {
       "metodo": "tabla",
       "leidos": 2053,
-      "nuevos": 23,
+      "nuevos": 24,
       "corregidos": 0,
-      "total": 2101,
-      "ultimo_epoch": 1792472400
+      "total": 2125,
+      "ultimo_epoch": 1792558800
     }
   },
   "problemas": []
