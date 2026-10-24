@@ -1,8 +1,9 @@
 {
-  "ejecucion_utc": "2026-10-24T05:50:02+00:00",
+  "ejecucion_utc": "2026-10-24T20:50:38+00:00",
   "estado": "error",
+  "servidor": "https://www.sircaduero.info/risr/",
   "series": {},
   "problemas": [
-    "Error de descarga: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'www.saihduero.es'. (_ssl.c:1010)>"
+    "Error SSL en https://www.sircaduero.info/risr/PL284/historico/xATRUFURfRDOywEU: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'www.sircaduero.info'. (_ssl.c:1010). Revisar dominio y certificado HTTPS."
   ]
 }
