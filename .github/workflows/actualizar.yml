@@ -2,7 +2,7 @@ name: Actualizar observatorio meteorologico
 on:
   workflow_dispatch:
   schedule:
-    - cron: '7,27,47 * * * *'
+    - cron: '3, 13, 23, 33, 43, 53 * * * *'
 permissions:
   contents: write
 concurrency:
