@@ -5,6 +5,8 @@ No convierte precipitacion de hora en curso en lluvia horaria cerrada.
 No modifica los CSV historicos heredados.
 """
 import csv
+import hashlib
+import io
 import json
 import math
 import os
@@ -20,6 +22,7 @@ URL = os.getenv('CHD_JSON_URL', 'https://datos.chduero.es/dataset/05988b20-50e9-
 DATOS = Path(os.getenv('CARPETA_DATOS', 'datos'))
 TZ = ZoneInfo('Europe/Madrid')
 ESTACIONES = {'castrocalbon': ('PL-9', 'Castrocalbón'), 'moralesdelrey': ('2082', 'Morales del Rey')}
+AUDIT_CAMPOS = ['captura_utc', 'epoch', 'estacion', 'codigo_chd', 'variable', 'valor_anterior', 'valor_nuevo', 'unidad', 'motivo', 'fuente']
 CAMPOS = ['epoch', 'fecha_hora_utc', 'fecha_hora_local', 'estacion', 'codigo_chd', 'variable', 'valor', 'unidad', 'calidad', 'fuente']
 VARIABLES = {'temperatura_instantanea': ('t_actual_c', '°C'), 'precipitacion_hora_en_curso': ('p_hora_actual_lm2', 'mm'), 'precipitacion_ano_hidrologico': ('p_ahidrologico_actual_lm2', 'mm')}
 
@@ -118,24 +121,41 @@ def cargar(ruta):
             salida[clave] = fila
         return salida
 
-def serializar(filas):
-    import io
+def serializar(filas, campos=CAMPOS):
     buffer = io.StringIO(newline='')
-    w = csv.DictWriter(buffer, fieldnames=CAMPOS, lineterminator='\n')
+    w = csv.DictWriter(buffer, fieldnames=campos, lineterminator='\n')
     w.writeheader()
     w.writerows(filas)
     return buffer.getvalue()
 
+def cargar_auditoria(ruta):
+    if not ruta.exists():
+        return []
+    with ruta.open(encoding='utf-8-sig', newline='') as f:
+        lector = csv.DictReader(f)
+        if lector.fieldnames != AUDIT_CAMPOS:
+            raise ValueError(f'Cabecera incompatible de auditoria: {ruta}')
+        filas = list(lector)
+        if any(None in fila or any(fila.get(c) is None for c in AUDIT_CAMPOS) for fila in filas):
+            raise ValueError(f'Auditoria corrupta: {ruta}')
+        return filas
+
+
 def ejecutar():
     DATOS.mkdir(parents=True, exist_ok=True)
     ahora = datetime.now(timezone.utc)
-    estado = {'ejecucion_utc': ahora.isoformat(timespec='seconds'), 'estado': 'error', 'fuente': URL, 'series': {}, 'problemas': []}
+    captura_utc = ahora.isoformat(timespec='seconds')
+    estado = {'ejecucion_utc': captura_utc, 'estado': 'error', 'fuente': URL,
+              'series': {}, 'problemas': []}
     try:
         nuevas, series = analizar(descargar(), ahora)
         ruta = DATOS / 'observaciones_chd.csv'
+        ruta_audit = DATOS / 'revisiones_chd.csv'
         anteriores = cargar(ruta)
+        auditoria = cargar_auditoria(ruta_audit)
         combinadas = dict(anteriores)
         altas, correcciones = 0, 0
+        eventos = []
         for fila in nuevas:
             clave = (fila['estacion'], fila['variable'], fila['epoch'])
             vieja = combinadas.get(clave)
@@ -143,19 +163,34 @@ def ejecutar():
                 combinadas[clave] = fila
                 altas += 1
             elif vieja != fila:
-                # Conservar la ultima revision del dato provisional.
+                # Guardar revision antes de actualizar el valor vigente.
+                eventos.append({
+                    'captura_utc': captura_utc, 'epoch': fila['epoch'],
+                    'estacion': fila['estacion'], 'codigo_chd': fila['codigo_chd'],
+                    'variable': fila['variable'], 'valor_anterior': vieja['valor'],
+                    'valor_nuevo': fila['valor'], 'unidad': fila['unidad'],
+                    'motivo': 'revision_fuente', 'fuente': fila['fuente'],
+                })
                 combinadas[clave] = fila
                 correcciones += 1
         ordenadas = sorted(combinadas.values(), key=lambda x: (int(x['epoch']), x['estacion'], x['variable']))
-        # El fichero antiguo queda intacto; solo se modifica observaciones_chd.csv.
-        atomico(ruta, serializar(ordenadas))
-        estado.update(estado='ok', series=series, nuevas=altas, revisadas=correcciones, total=len(ordenadas))
+        # Preparar ambos archivos antes de reemplazar ninguno.
+        if altas or correcciones or not ruta.exists():
+            texto_obs = serializar(ordenadas)
+            texto_audit = serializar(auditoria + eventos, AUDIT_CAMPOS)
+            if eventos or not ruta_audit.exists():
+                atomico(ruta_audit, texto_audit)
+            atomico(ruta, texto_obs)
+        estado.update(estado='ok', series=series, nuevas=altas,
+                      revisadas=correcciones, total=len(ordenadas),
+                      revisiones_acumuladas=len(auditoria) + len(eventos))
     except Exception as exc:
         estado['problemas'].append(str(exc))
         print(f'ERROR: {exc}', file=sys.stderr)
     finally:
         atomico(DATOS / 'estado.json', json.dumps(estado, ensure_ascii=False, indent=2) + '\n')
     return 0 if estado['estado'] == 'ok' else 1
+
 
 if __name__ == '__main__':
     sys.exit(ejecutar())
