@@ -1,18 +1,25 @@
 name: Actualizar observatorio meteorologico
+
 on:
   workflow_dispatch:
   schedule:
-    - cron: '3, 13, 23, 33, 43, 53 * * * *'
+    - cron: '3,13,23,33,43,53 * * * *'
+
 permissions:
   contents: write
+
 concurrency:
   group: observatorio-meteo
   cancel-in-progress: false
+
 jobs:
   captura:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -24,10 +31,17 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add datos/observaciones_chd.csv datos/estado.json
+          git add datos/observaciones_chd.csv datos/revisiones_chd.csv datos/estado.json
           if ! git diff --cached --quiet; then
             git commit -m 'Actualizar observaciones CHD'
-            git push
+            for intento in 1 2 3 4; do
+              if git push; then exit 0; fi
+              echo "Conflicto al publicar, intento $intento"
+              git fetch origin main
+              git rebase origin/main || exit 1
+              sleep 3
+            done
+            exit 1
           fi
       - name: Marcar fallo si la captura fallo
         if: steps.captura.outcome == 'failure'
