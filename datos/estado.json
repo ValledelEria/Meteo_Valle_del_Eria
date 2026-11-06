@@ -1,22 +1,22 @@
 {
-  "ejecucion_utc": "2026-11-06T05:26:17+00:00",
+  "ejecucion_utc": "2026-11-06T06:30:39+00:00",
   "estado": "ok",
   "fuente": "https://datos.chduero.es/dataset/05988b20-50e9-4306-961b-95a0d11f138e/resource/b7689d17-262c-499d-9676-86d441bab49c/download/estado_pluviometros.json",
   "series": {
     "castrocalbon": {
       "codigo_chd": "PL-9",
-      "fecha_utc": "2026-11-06T05:10:00+00:00",
-      "antiguedad_horas": 0.27
+      "fecha_utc": "2026-11-06T06:20:00+00:00",
+      "antiguedad_horas": 0.18
     },
     "moralesdelrey": {
       "codigo_chd": "2082",
-      "fecha_utc": "2026-11-06T05:10:00+00:00",
-      "antiguedad_horas": 0.27
+      "fecha_utc": "2026-11-06T06:20:00+00:00",
+      "antiguedad_horas": 0.18
     }
   },
   "problemas": [],
   "nuevas": 6,
   "revisadas": 0,
-  "total": 2154,
+  "total": 2160,
   "revisiones_acumuladas": 0
 }
