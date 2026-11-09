@@ -2681,3 +2681,9 @@ epoch,fecha_hora_utc,fecha_hora_local,estacion,codigo_chd,variable,valor,unidad,
 1794199800,2026-11-09 04:50:00,2026-11-09T05:50:00+01:00,castrocalbon,PL-9,precipitacion_ano_hidrologico,31.8,mm,ok,CHD_estado_pluviometros
 1794199800,2026-11-09 04:50:00,2026-11-09T05:50:00+01:00,castrocalbon,PL-9,precipitacion_hora_en_curso,1,mm,ok,CHD_estado_pluviometros
 1794199800,2026-11-09 04:50:00,2026-11-09T05:50:00+01:00,castrocalbon,PL-9,temperatura_instantanea,10.4,°C,ok,CHD_estado_pluviometros
+1794202800,2026-11-09 05:40:00,2026-11-09T06:40:00+01:00,moralesdelrey,2082,precipitacion_ano_hidrologico,13.9,mm,ok,CHD_estado_pluviometros
+1794202800,2026-11-09 05:40:00,2026-11-09T06:40:00+01:00,moralesdelrey,2082,precipitacion_hora_en_curso,0,mm,ok,CHD_estado_pluviometros
+1794202800,2026-11-09 05:40:00,2026-11-09T06:40:00+01:00,moralesdelrey,2082,temperatura_instantanea,11,°C,ok,CHD_estado_pluviometros
+1794203400,2026-11-09 05:50:00,2026-11-09T06:50:00+01:00,castrocalbon,PL-9,precipitacion_ano_hidrologico,31.8,mm,ok,CHD_estado_pluviometros
+1794203400,2026-11-09 05:50:00,2026-11-09T06:50:00+01:00,castrocalbon,PL-9,precipitacion_hora_en_curso,0,mm,ok,CHD_estado_pluviometros
+1794203400,2026-11-09 05:50:00,2026-11-09T06:50:00+01:00,castrocalbon,PL-9,temperatura_instantanea,10.7,°C,ok,CHD_estado_pluviometros
