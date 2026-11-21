@@ -3935,3 +3935,9 @@ epoch,fecha_hora_utc,fecha_hora_local,estacion,codigo_chd,variable,valor,unidad,
 1795231200,2026-11-21 03:20:00,2026-11-21T04:20:00+01:00,moralesdelrey,2082,precipitacion_ano_hidrologico,110.9,mm,ok,CHD_estado_pluviometros
 1795231200,2026-11-21 03:20:00,2026-11-21T04:20:00+01:00,moralesdelrey,2082,precipitacion_hora_en_curso,0.2,mm,ok,CHD_estado_pluviometros
 1795231200,2026-11-21 03:20:00,2026-11-21T04:20:00+01:00,moralesdelrey,2082,temperatura_instantanea,7.8,°C,ok,CHD_estado_pluviometros
+1795262400,2026-11-21 12:00:00,2026-11-21T13:00:00+01:00,castrocalbon,PL-9,precipitacion_ano_hidrologico,131.5,mm,ok,CHD_estado_pluviometros
+1795262400,2026-11-21 12:00:00,2026-11-21T13:00:00+01:00,castrocalbon,PL-9,precipitacion_hora_en_curso,0,mm,ok,CHD_estado_pluviometros
+1795262400,2026-11-21 12:00:00,2026-11-21T13:00:00+01:00,castrocalbon,PL-9,temperatura_instantanea,9.2,°C,ok,CHD_estado_pluviometros
+1795262400,2026-11-21 12:00:00,2026-11-21T13:00:00+01:00,moralesdelrey,2082,precipitacion_ano_hidrologico,117.5,mm,ok,CHD_estado_pluviometros
+1795262400,2026-11-21 12:00:00,2026-11-21T13:00:00+01:00,moralesdelrey,2082,precipitacion_hora_en_curso,0,mm,ok,CHD_estado_pluviometros
+1795262400,2026-11-21 12:00:00,2026-11-21T13:00:00+01:00,moralesdelrey,2082,temperatura_instantanea,10.1,°C,ok,CHD_estado_pluviometros
